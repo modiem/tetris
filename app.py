@@ -150,9 +150,35 @@ class Piece(object):
     def __init__(self, x, y, shape):
         self.x = x
         self.y = y
-        self.shape = shape
+        self.shape = shape # list of rotatted tetriminoes
         self.color = shape_colors[shapes.index(shape)]
         self.rotation = 0
+
+    def get_positions(self):
+        '''
+        Reutrn a list of coordinates of the tetrimino blocks.
+        Each coordinate should be assign a color.
+        '''
+        positions = []
+
+        ## get tetrimino
+        # tetrimino =  ['.....',
+                    #   '.0...',
+                    #   '.000.',
+                    #   '.....',
+                    #   '.....']
+        tetrimino = self.shape[self.rotation]
+
+        for i, line in enumerate(tetrimino):
+            line = list(line)
+            for j, col in enumerate(line):
+                if col == "0":
+                    positions.append((self.x + j, self.y + i))
+
+        for i, pos in enumerate(positions):
+            positions[i] = (pos[0] -2, pos[1]-4)
+
+        return positions
 
 def create_grid(locked_positions={}):
     grid = [[BLACK for _ in range(cols)] for _ in range(rows)]
@@ -163,11 +189,20 @@ def create_grid(locked_positions={}):
                 grid[i][j] = locked_positions[(j, i)]
     return grid
 
-def convert_shape_format(shape):
-    pass
 
 def valid_space(shape, grid):
-    pass
+    accepted_positions = [[(j, i) for j in range(len(grid[i])) if grid[i][j] == BLACK] for i in range(len(grid))]
+    ## flatten accepted_positions:
+    accepted_positions = [_ for sub in accepted_positions for _ in sub]
+
+
+    positions = shape.get_positions()
+    for pos in positions:
+        if pos not in accepted_positions and pos[1] >= 0:
+            return False
+
+    return True
+
 
 def check_lost(positions):
     for pos in positions:
@@ -177,7 +212,8 @@ def check_lost(positions):
     return False
 
 def get_shape():
-    return random.choice(shapes)
+    random_shape = random.choice(shapes)
+    return Piece(5, 0, random_shape)
 
 def draw_text_middle(text, size, color, surface):
     font = pygame.font.SysFont("comicsans", size, bold=True)
@@ -196,12 +232,28 @@ def draw_grid(surface, rows, cols):
 
 
 def clear_rows(grid, locked):
-    pass
+    return False
 
-def draw_next_shape(next_shape, surface):
-    pass
 
-def draw_window(surface, score):
+def draw_next_piece(next_piece, surface):
+
+    sx = top_left_x + play_width + 50
+    sy = top_left_y + play_height/2
+
+    font = pygame.font.SysFont("comicsans", 30)
+    label = font.render("Next Shape: ", 1, WHITE)
+    surface.blit(label, (sx, sy - label.get_height()))
+
+
+
+def draw_window(surface, stats, next_piece):
+    '''
+    draw whole window:
+        - background
+        - grid, border, separation
+        - score board
+        - tetrominoes
+    '''
 
     surface.fill(BLACK)
     
@@ -209,18 +261,36 @@ def draw_window(surface, score):
     title_font = pygame.font.SysFont("comicsans", 60)
     title_label = title_font.render("Tetris", 1, WHITE)   
     surface.blit(title_label, (grid_middle_x - (title_label.get_width() // 2), 30))
-
-    ### draw Score board
-    score_font = pygame.font.SysFont("comicsans", 40)
-    score_label = score_font.render(f"Score: {score}", 1, WHITE)   
-    surface.blit(score_label, (top_left_x + play_width + 50, top_left_y))
     
+    # draw grid and border
+    draw_grid(surface, rows, cols)
+    pygame.draw.rect(surface, RED, (top_left_x, top_left_y, play_width, play_height), 3)
+
+    ### draw Score board and other statistics
+    sx = top_left_x + play_width + 50
+    sy = top_left_y
+
+    stats_font = pygame.font.SysFont("comicsans", 40)
+    score_label = stats_font.render(f"Score: {stats['score']}", 1, WHITE)   
+    surface.blit(score_label, (sx, sy))
+    line_height = score_label.get_height()
+
+    level_label = stats_font.render(f"level: {stats['level']}", 1, WHITE)
+    surface.blit(level_label, (sx, sy + line_height + 10))
+
+    lines_label = stats_font.render(f"lines: {stats['lines']}", 1, WHITE)
+    surface.blit(lines_label, (sx, sy + (line_height + 10) * 2))
+
+
+    ### draw next tetriminoes
+    # draw_next_piece(next_piece, WIN)
+
+
+    ### draw tetriminoes
     for i in range(len(grid)):
         for j in range(len(grid[i])):
             pygame.draw.rect(surface, grid[i][j], (top_left_x + j*block_size, top_left_y + i* block_size, block_size, block_size), 0)
 
-    draw_grid(surface, rows, cols)
-    pygame.draw.rect(surface, RED, (top_left_x, top_left_y, play_width, play_height), 3)
 
     
 
@@ -228,21 +298,42 @@ def main():
     global grid
 
     locked_positions = {}
-    grid = create_grid(locked_positions)
+    stats = {
+        "level": 1,
+        "score": 0,
+        "lines": 0,
+    }
 
-    change_peice = False
     run = True
+    change_piece = False
     current_piece = get_shape()
     next_piece = get_shape()
-    score = 0
+
+    clock = pygame.time.Clock()
     fall_time = 0
     level_time = 0
-    fall_speed = 0.8
+    fall_speed = 0.5
 
 
 
     while run:
 
+        ## set the timer
+        grid = create_grid(locked_positions)
+        fall_time += clock.get_rawtime()
+        level_time += clock.get_rawtime()
+        clock.tick()
+
+        # Piece Falling Code
+        if fall_time/1000 >= fall_speed:
+            fall_time = 0
+            current_piece.y += 1
+            if not (valid_space(current_piece, grid)) and current_piece.y > 0:
+                current_piece.y -= 1
+                change_piece = True
+
+
+        # control tetrominoe through keys
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
@@ -252,38 +343,54 @@ def main():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
                     current_piece.x -= 1
-                    if not valid_space(current_peice, grid):
+                    if not valid_space(current_piece, grid):
                         current_piece.x += 1
 
                 elif event.key == pygame.K_RIGHT:
-                    current_peice.x += 1
-                    if not valid_space(current_peice, grid):
+                    current_piece.x += 1
+                    if not valid_space(current_piece, grid):
                         current_piece.x -= 1
 
                 elif event.key == pygame.K_UP:
                     # ROTATE SHAPE
-                    current_piece.rotation = (current_peice.rotation + 1) % len(current_piece.shape)
-                    if not valid_space(current_peice, grid):
-                        current_peice.rotation = (current_piece.rotation - 1) % len(current_peice.shape)
+                    current_piece.rotation = (current_piece.rotation + 1) % len(current_piece.shape)
+                    if not valid_space(current_piece, grid):
+                        current_piece.rotation = (current_piece.rotation - 1) % len(current_piece.shape)
 
                 elif event.key == pygame.K_DOWN:
                     # go to botton
                     while valid_space(current_piece,grid):
                         current_piece.y += 1
-                    current_peice.y -= 1
+                    current_piece.y -= 1
+                    change_piece = True
 
-        ## Whenever a peice get locked (settled down)
+
+        ## Add piece to the grid for drawing
+        shape_pos = current_piece.get_positions()
+        for i in range(len(shape_pos)):
+            (x, y) = shape_pos[i]
+            if y >= 0:
+                grid[y][x] = current_piece.color
+
+
+        ## Whenever a piece get locked (settled down)
         if change_piece:
+            for pos in shape_pos:
+                locked_positions[pos] = current_piece.color
 
             current_piece = next_piece
             next_piece = get_shape()
+            change_piece = False
+            stats["score"] += 1
+            fall_time = 0
+
+
 
             ### check filled-up rows
-            if clear_row(grid, lock_positions):
-                score += 10
+            if clear_rows(grid, locked_positions):
+                stats["lines"] += 1
 
-        draw_window(WIN, score)
-        # draw_next_shape(next_piece, WIN)
+        draw_window(WIN, stats, next_piece)
         pygame.display.update()
 
         if check_lost(locked_positions):

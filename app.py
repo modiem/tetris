@@ -27,16 +27,16 @@ rows, cols = 20, 10
 block_size = 30
 
 top_left_x = (s_width - play_width) // 2
-top_left_y = s_height - play_height
+top_left_y = s_height - play_height - 20
 
 grid_middle_x, grid_middle_y = (top_left_x + play_width//2, top_left_y + play_height //2)
 
 ## Define some color
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-GRAY = (128, 128, 128)
-RED = (255, 0, 0)
-YELLOW = (255, 255, 0)
+WHITE = (255, 243, 176) # Medium Champagne
+BLACK = (51, 92, 103) # Deep Space Sparkle
+GRAY = (27, 58, 75) # Charcoal
+RED = (11, 82, 91) # Midnight Green Eagle Green
+YELLOW = (224, 159, 62) # Indian Yellow
 
 
 # SHAPE FORMATS
@@ -144,7 +144,13 @@ T = [['.....',
       '.....']]
 
 shapes = [S, Z, I, O, J, L, T]
-shape_colors = [(0, 255, 0), (255, 0, 0), (0, 255, 255), (255, 255, 0), (255, 165, 0), (0, 0, 255), (128, 0, 128)]
+shape_colors = [(219, 180, 44), # Gold Metallic
+                (142, 202, 230), # Light Cornflower Blue
+                (255, 238, 50), # Yellow 
+                (255, 239, 211),  # Papaya Whip
+                (188, 138, 95),  # Antique Brass
+                (144, 190, 109),  # olive
+                (239, 189, 235)] # Pink Lavender
 
 class Piece(object):
     def __init__(self, x, y, shape):
@@ -216,24 +222,48 @@ def get_shape():
     return Piece(5, 0, random_shape)
 
 def draw_text_middle(text, size, color, surface):
+    # pygame.draw.rect(surface, BLACK, (0, grid_middle_x - 80, s_width, 120), 0)
     font = pygame.font.SysFont("comicsans", size, bold=True)
     label = font.render(text, 1, color)
 
-    surface.blit(label, (grid_middle_x - (label.get_width()//2), grid_middle_y - label.get_height()//2-30))
+    surface.blit(label, (grid_middle_x - (label.get_width()//2), grid_middle_y - 50))
 
 def draw_grid(surface, rows, cols):
     sx = top_left_x
     sy = top_left_y
     for i in range(rows):
-        pygame.draw.line(surface, GRAY, (sx, sy + i*block_size), (sx + play_width, sy + i*block_size))
+        pygame.draw.line(surface, RED, (sx, sy + i*block_size), (sx + play_width, sy + i*block_size), 1)
     
     for j in range(cols):
-        pygame.draw.line(surface, GRAY, (sx + j * block_size, sy), (sx + j * block_size, sy + play_height))
+        pygame.draw.line(surface, RED, (sx + j * block_size, sy), (sx + j * block_size, sy + play_height), 1)
 
 
-def clear_rows(grid, locked):
-    return False
+def clear_rows(grid, locked_positions):
+    cleared_rows = 0
+    i = len(grid)
+    while i > 0:
+        i -= 1
+        row = grid[i]
+        if BLACK not in row:
+            ## add positions to remove from locked_positions
+            for j in range(len(row)):
+                try:
+                    del locked_positions[(j, i)]
+                except:
+                    continue
+            cleared_rows += 1
 
+            for key in sorted(list(locked_positions), key = lambda x: x[1])[::-1]:
+                (x, y) = key
+                if y < i:
+                    newKey = (x, y + 1)
+                    locked_positions[newKey] = locked_positions.pop(key) 
+
+            grid = create_grid(locked_positions)
+            i += 1
+
+    return grid, cleared_rows
+            
 
 def draw_next_piece(next_piece, surface):
 
@@ -242,7 +272,13 @@ def draw_next_piece(next_piece, surface):
 
     font = pygame.font.SysFont("comicsans", 30)
     label = font.render("Next Shape: ", 1, WHITE)
-    surface.blit(label, (sx, sy - label.get_height()))
+    surface.blit(label, (sx, sy - label.get_height() - 10))
+
+    for i, row in enumerate(next_piece.shape[next_piece.rotation]):
+        row = list(row)
+        for j, col in enumerate(row):
+            if col == "0":
+                pygame.draw.rect(surface, next_piece.color, (sx + j * block_size, sy + i * block_size, block_size, block_size), 0)
 
 
 
@@ -262,10 +298,6 @@ def draw_window(surface, stats, next_piece):
     title_label = title_font.render("Tetris", 1, WHITE)   
     surface.blit(title_label, (grid_middle_x - (title_label.get_width() // 2), 30))
     
-    # draw grid and border
-    draw_grid(surface, rows, cols)
-    pygame.draw.rect(surface, RED, (top_left_x, top_left_y, play_width, play_height), 3)
-
     ### draw Score board and other statistics
     sx = top_left_x + play_width + 50
     sy = top_left_y
@@ -283,13 +315,17 @@ def draw_window(surface, stats, next_piece):
 
 
     ### draw next tetriminoes
-    # draw_next_piece(next_piece, WIN)
+    draw_next_piece(next_piece, WIN)
 
 
     ### draw tetriminoes
     for i in range(len(grid)):
         for j in range(len(grid[i])):
             pygame.draw.rect(surface, grid[i][j], (top_left_x + j*block_size, top_left_y + i* block_size, block_size, block_size), 0)
+
+    # draw grid and border
+    draw_grid(surface, rows, cols)
+    pygame.draw.rect(surface, RED, (top_left_x, top_left_y, play_width, play_height), 4)
 
 
     
@@ -313,6 +349,7 @@ def main():
     fall_time = 0
     level_time = 0
     fall_speed = 0.5
+    level = 0
 
 
 
@@ -323,6 +360,17 @@ def main():
         fall_time += clock.get_rawtime()
         level_time += clock.get_rawtime()
         clock.tick()
+
+        if level_time/1000 > 4:
+            level_time = 0      
+            if fall_speed > 0.15:
+                fall_speed -= 0.005
+                level += 1
+                if level >= 10:
+                    stats["level"] += 1
+                    level = 0
+                
+
 
         # Piece Falling Code
         if fall_time/1000 >= fall_speed:
@@ -381,14 +429,12 @@ def main():
             current_piece = next_piece
             next_piece = get_shape()
             change_piece = False
-            stats["score"] += 1
+            stats["score"] += 5
             fall_time = 0
 
-
-
-            ### check filled-up rows
-            if clear_rows(grid, locked_positions):
-                stats["lines"] += 1
+            ## check complete rows
+            grid, num = clear_rows(grid, locked_positions)
+            stats["lines"] += num
 
         draw_window(WIN, stats, next_piece)
         pygame.display.update()
@@ -396,10 +442,11 @@ def main():
         if check_lost(locked_positions):
             run = False
 
-    draw_text_middle("You Lost", 40, WHITE, WIN)
+    draw_text_middle("Game Over!!", 40, WHITE, WIN)
     pygame.display.update()
-    pygame.time.delay(3000)
+    pygame.time.delay(5000)
 
+    ## press space bar to start a new game
 
 def main_menu():
 

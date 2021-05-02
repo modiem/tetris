@@ -11,4 +11,3 @@ export const createStage = () =>
 			Array(STAGE_WIDTH).fill([0, 'clear'])
 			)
 		)
-

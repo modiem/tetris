@@ -8,7 +8,6 @@ export const StyledStartButton = styled.div`
 	border-radius: 20px;
 	border: none;
 	color: white;
-	margin: 20px 0 20px 0;
 	padding: 20px;
 	font-family: Pixel, Arial, Helvetica, Sans-serif;
 	font-size: 1rem;

@@ -1,9 +1,15 @@
 # Tetris
 Tetris has very simple rules: 
-- you can only move the pieces in specific ways (left, right, rotate, speed up the dropping); 
+- you can only move the pieces in specific ways (left, right, down, up to rotate, space bar to speed up the dropping); 
 - your game is over if your pieces reach the top of the screen; 
 - and you can only remove pieces from the screen by filling all the blank space in a line.
 
+# Usage
+
+bash`pip install -r requirement.txt`
+
+Play game
+bash`python3 app.py`
 
 # Credits
 This project would not be possible without these awesome people. I am grateful to them for their contributions to open source.
